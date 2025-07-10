@@ -1,0 +1,121 @@
+-- Services
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local TweenService = game:GetService("TweenService")
+local TeleportService = game:GetService("TeleportService")
+local HttpService = game:GetService("HttpService")
+
+-- Config
+local localPlayer = Players.LocalPlayer
+local PLACE_ID = game.PlaceId
+local HOP_INTERVAL = 300 -- 5 minutes in seconds
+local LOADER_URL = "https://your-domain-or-github-raw/script.lua" -- <--- REPLACE ME
+
+-- Get HumanoidRootPart
+local function getHRP(char)
+    return char:FindFirstChild("HumanoidRootPart")
+end
+
+-- Get nearest enemy player on a specific team
+local function getNearestTarget(teamName)
+    local myChar = localPlayer.Character
+    local myHRP = myChar and getHRP(myChar)
+    if not myHRP then return end
+
+    local closest, closestDist = nil, math.huge
+    for _, p in pairs(Players:GetPlayers()) do
+        if p ~= localPlayer and p.Team and p.Team.Name == teamName then
+            local char = p.Character
+            local hrp = char and getHRP(char)
+            if hrp then
+                local dist = (myHRP.Position - hrp.Position).Magnitude
+                if dist < closestDist then
+                    closest = p
+                    closestDist = dist
+                end
+            end
+        end
+    end
+    return closest
+end
+
+-- Smooth tween move
+local activeTween = nil
+local function teleportSmoothly(hrp, destCFrame)
+    if activeTween then activeTween:Cancel() end
+    activeTween = TweenService:Create(hrp, TweenInfo.new(0.2, Enum.EasingStyle.Linear), {CFrame = destCFrame})
+    activeTween:Play()
+end
+
+-- Main behavior loop
+local function teleportLoop()
+    return RunService.Heartbeat:Connect(function()
+        local char = localPlayer.Character
+        local hrp = char and getHRP(char)
+        local team = localPlayer.Team
+        if not hrp or not team then return end
+
+        if team.Name == "Zombies" then
+            local target = getNearestTarget("Humans")
+            if target and target.Character then
+                local targetHRP = getHRP(target.Character)
+                if targetHRP then
+                    hrp.CFrame = targetHRP.CFrame -- SNAP instantly
+                end
+            end
+
+        elseif team.Name == "Humans" then
+            local target = getNearestTarget("Zombies")
+            if target and target.Character then
+                local targetHRP = getHRP(target.Character)
+                if targetHRP then
+                    local dist = (hrp.Position - targetHRP.Position).Magnitude
+                    if dist < 100 then -- only flee if close
+                        local offset = (hrp.Position - targetHRP.Position)
+                        offset = Vector3.new(offset.X, 0, offset.Z).Unit
+                        local dest = hrp.Position + offset * 100
+                        teleportSmoothly(hrp, CFrame.new(dest))
+                    end
+                end
+            end
+        end
+    end)
+end
+
+-- Handle respawn
+local currentConnection
+local function hookCharacter()
+    if currentConnection then currentConnection:Disconnect() end
+    currentConnection = teleportLoop()
+end
+
+if localPlayer.Character then
+    task.spawn(hookCharacter)
+end
+localPlayer.CharacterAdded:Connect(function()
+    task.wait(1)
+    hookCharacter()
+end)
+
+-- Auto Server Hop w/ Script Reload
+task.spawn(function()
+    while true do
+        task.wait(HOP_INTERVAL)
+
+        local success, servers = pcall(function()
+            return HttpService:JSONDecode(game:HttpGet(
+                "https://games.roblox.com/v1/games/"..PLACE_ID.."/servers/Public?sortOrder=Desc&limit=100"
+            ))
+        end)
+
+        if success and servers and servers.data then
+            for _, server in ipairs(servers.data) do
+                if server.playing < server.maxPlayers and server.id ~= game.JobId then
+                    local loader = game:HttpGet(LOADER_URL)
+                    TeleportService:TeleportToPlaceInstance(PLACE_ID, server.id, localPlayer, loader)
+                    return
+                end
+            end
+        end
+    end
+end)
