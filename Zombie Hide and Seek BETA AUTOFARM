@@ -9,7 +9,7 @@ local HttpService = game:GetService("HttpService")
 local localPlayer = Players.LocalPlayer
 local PLACE_ID = game.PlaceId
 local HOP_INTERVAL = 300 -- 5 minutes in seconds
-local LOADER_URL = "https://your-domain-or-github-raw/script.lua" -- <--- REPLACE ME
+local LOADER_URL = "https://raw.githubusercontent.com/fart029/Gubbzly-Hub/refs/heads/main/Zombie%20Hide%20and%20Seek%20BETA%20AUTOFARM"
 
 -- Get HumanoidRootPart
 local function getHRP(char)
