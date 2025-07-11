@@ -71,9 +71,7 @@ local function teleportLoop()
                 if targetHRP then
                     local dist = (hrp.Position - targetHRP.Position).Magnitude
                     if dist < 100 then -- only flee if close
-                        local offset = (hrp.Position - targetHRP.Position)
-                        offset = Vector3.new(offset.X, 0, offset.Z).Unit
-                        local dest = hrp.Position + offset * 100
+                        local dest = hrp.Position + Vector3.new(0, 100, 0) -- UP 100 studs only
                         teleportSmoothly(hrp, CFrame.new(dest))
                     end
                 end
